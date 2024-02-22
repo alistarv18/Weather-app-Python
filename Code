@@ -1,0 +1,96 @@
+import tkinter as tk
+import requests
+from configparser import ConfigParser
+from tkinter import messagebox
+
+API_URL = "https://api.openweathermap.org/data/2.5/weather?q={}&appid={}"
+API_FILE = 'weather.key'
+
+
+class WeatherApp(tk.Tk):
+    """
+           Initializeaza aplicatia Weather. Incarca cheia de API din fisierul de configurare, seteaza titlul aplicatiei
+           si creeaza interfata grafica a aplicatiei.
+
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)  # constructor
+        self.api_key = None
+        self.title("Weather Application")
+        self.config(background="#5CDB95")
+
+        self.search_bar = tk.StringVar()
+        self.search_city = tk.Entry(self, textvariable=self.search_bar, fg='#05386B', font=("Verdana", 20), bd=0,
+                                    bg="#EDF5E1")
+        self.search_city.pack(pady=20)
+        self.search_city.bind("<Return>", self.print_weather)
+
+        self.button = tk.Button(self, text="Get weather", width=15, bg="#05386B", fg="white", font=("Verdana", 20),
+                                command=self.print_weather)
+        self.button.pack(pady=10)
+
+        self.location_city = tk.Label(self, text='', font=("Verdana", 25), bg="#5CDB95", fg='#05386B')
+        self.location_city.pack(pady=10)
+
+        self.temperature = tk.Label(self, text='', font=("Verdana", 20), bg="#5CDB95", fg='#05386B')
+        self.temperature.pack(pady=10)
+
+        self.weather_label = tk.Label(self, text='', font=("Verdana", 20), bg="#5CDB95", fg='#05386B')
+        self.weather_label.pack(pady=10)
+
+        self.load_api_key()
+
+    def load_api_key(self):
+        """
+               Incarca cheia de API din fisierul de configurare si o stocheaza in atributul de clasa `api_key`.
+        """
+        file_a = ConfigParser()
+        file_a.read(API_FILE)
+        self.api_key = file_a.get('api_key', 'key')
+
+    def weather_func(self, city):
+        """
+            Returneaza informatiile meteorologice pentru orasul specificat prin parametrul `city`.
+
+            :param city: un string ce reprezinta numele orasului pentru care se cere informatia meteorologica
+            :return:  informatii meteorologice (nume oras, tara, temperatura, starea vremii)
+            sau None in cazul in care apare o eroare
+        """
+        try:
+            final = requests.get(API_URL.format(city, self.api_key))
+            if final.status_code == 200:  # Verifica daca raspunsul este OK
+                json_file = final.json()
+                city = json_file['name']
+                country_name = json_file['sys']['country']
+                country_temp = json_file['main']['temp'] - 273.15
+                weather_display = json_file['weather'][0]['main']
+                return city, country_name, country_temp, weather_display
+            else:
+                print(f"HTTP Error {final.status_code}: {final.reason}")
+        except requests.exceptions.RequestException as e:
+            print(f"Request Exception: {e}")
+        except (KeyError, ValueError) as e:
+            print(f"JSON parsing error: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+        messagebox.showerror("Error", "Try again")
+        return None
+
+    def print_weather(self, event=None):
+        """
+               Afiseaza informatiile meteorologice pentru orasul introdus in campul de cautare.
+
+               :param event:  utilizat pentru a obtine informatia meteorologica la apasarea tastei Enter
+         """
+        city = self.search_city.get()
+        weather = self.weather_func(city)
+        if weather:
+            self.location_city['text'] = '{}, {}'.format(weather[0], weather[1])
+            self.temperature['text'] = '{:.2f} °C, {:.2f} °F'.format(weather[2], weather[2] * 9 / 5 + 32)
+            self.weather_label['text'] = weather[3]
+
+
+if __name__ == "__main__":
+    app = WeatherApp()
+    app.mainloop()
